@@ -62,13 +62,13 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: false
 
       - name: List dist folder
-        run: ls -la apex-desktop/dist/ || echo "dist folder empty or missing"
+        run: find apex-desktop/dist -type f || echo "dist folder empty or missing"
 
-      - name: Upload Mac DMG
+      - name: Upload Mac build
         uses: actions/upload-artifact@v4
         with:
           name: APEX-AI-Mac
-          path: apex-desktop/dist/*.zip
+          path: apex-desktop/dist/
           if-no-files-found: warn
 
   release:
