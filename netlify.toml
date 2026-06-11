@@ -12,6 +12,11 @@
 [[plugins]]
   package = "@netlify/plugin-functions-install-core"
 
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
 [[redirects]]
   from = "/*"
   to = "/index.html"
