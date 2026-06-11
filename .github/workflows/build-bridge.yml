@@ -1,0 +1,38 @@
+name: Build APEX AI Bridge (Windows .exe)
+
+on:
+  push:
+    paths:
+      - 'apex-bridge-all.py'
+      - 'requirements-all.txt'
+      - '.github/workflows/build-bridge.yml'
+  workflow_dispatch:  # allows manual trigger from GitHub website
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install pyinstaller
+          pip install websockets psutil irsdk pyaccsharedmemory pyRfactor2SharedMemory pycryptodome
+
+      - name: Build .exe with PyInstaller
+        run: |
+          pyinstaller --onefile --name "APEX-AI-Bridge" --console apex-bridge-all.py
+
+      - name: Upload .exe as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: APEX-AI-Bridge-Windows
+          path: dist/APEX-AI-Bridge.exe
+          retention-days: 30
