@@ -64,12 +64,18 @@ jobs:
       - name: List dist folder
         run: find apex-desktop/dist -type f || echo "dist folder empty or missing"
 
+      - name: Move zip files
+        run: |
+          mkdir -p mac-out
+          find apex-desktop/dist -name "*.zip" -exec cp {} mac-out/ \;
+          ls -la mac-out/
+
       - name: Upload Mac build
         uses: actions/upload-artifact@v4
         with:
           name: APEX-AI-Mac
-          path: apex-desktop/dist/
-          if-no-files-found: warn
+          path: mac-out/
+          if-no-files-found: error
 
   release:
     needs: [build-windows, build-mac]
