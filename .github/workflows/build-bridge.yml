@@ -22,10 +22,12 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
+        shell: bash
         run: |
-          pip install pyinstaller
-          pip install websockets psutil pyirsdk pyaccsharedmemory pycryptodome
-          pip install pyrf2 || echo "pyrf2 optional, skipping"
+          pip install pyinstaller websockets psutil pycryptodome
+          pip install pyirsdk || true
+          pip install pyaccsharedmemory || true
+          pip install pyrf2 || true
 
       - name: Build .exe with PyInstaller
         run: |
