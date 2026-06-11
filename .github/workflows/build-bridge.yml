@@ -24,7 +24,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install pyinstaller
-          pip install websockets psutil irsdk pyaccsharedmemory pyRfactor2SharedMemory pycryptodome
+          pip install websockets psutil pyirsdk pyaccsharedmemory pyRfactor2SharedMemory pycryptodome
 
       - name: Build .exe with PyInstaller
         run: |
