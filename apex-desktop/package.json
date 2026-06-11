@@ -2,6 +2,11 @@
   "name": "apex-ai",
   "version": "1.0.0",
   "description": "APEX AI — Sim Racing Coach",
+  "author": "APEX AI",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sauko323/apex-ai.git"
+  },
   "main": "main.js",
   "scripts": {
     "start": "electron .",
