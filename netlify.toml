@@ -1,6 +1,13 @@
+[build]
+  publish = "."
+  command = "npm install --prefix netlify/functions"
+
 [functions]
   directory = "netlify/functions"
   node_bundler = "esbuild"
+
+[[plugins]]
+  package = "@netlify/plugin-functions-install-core"
 
 [[redirects]]
   from = "/*"
