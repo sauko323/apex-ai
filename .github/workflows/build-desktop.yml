@@ -28,11 +28,14 @@ jobs:
         working-directory: apex-desktop
         run: npx electron-builder --win --publish never
 
+      - name: List dist folder
+        run: dir apex-desktop\dist\ || echo dist empty
+
       - name: Upload Windows installer
         uses: actions/upload-artifact@v4
         with:
           name: APEX-AI-Windows
-          path: apex-desktop/dist/
+          path: apex-desktop/dist/*.exe
           if-no-files-found: warn
 
   build-mac:
@@ -55,12 +58,17 @@ jobs:
       - name: Build Mac DMG
         working-directory: apex-desktop
         run: npx electron-builder --mac --publish never
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+
+      - name: List dist folder
+        run: ls -la apex-desktop/dist/ || echo "dist folder empty or missing"
 
       - name: Upload Mac DMG
         uses: actions/upload-artifact@v4
         with:
           name: APEX-AI-Mac
-          path: apex-desktop/dist/
+          path: apex-desktop/dist/*.dmg
           if-no-files-found: warn
 
   release:
