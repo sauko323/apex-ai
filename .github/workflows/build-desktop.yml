@@ -68,7 +68,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: APEX-AI-Mac
-          path: apex-desktop/dist/*.dmg
+          path: apex-desktop/dist/*.zip
           if-no-files-found: warn
 
   release:
