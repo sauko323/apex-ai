@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>APEX AI — Sign In</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root {
+    --bg: #0a0a0f; --bg2: #111118; --bg3: #18181f; --border: #2a2a38;
+    --accent: #e8ff00; --accent2: #00d4ff; --red: #ff3b3b; --green: #00e676;
+    --text: #f0f0f0; --text2: #a0a0b8; --text3: #606078;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--text); font-family:'Segoe UI',system-ui,sans-serif; min-height:100vh; display:flex; align-items:center; justify-content:center; }
+  .bg-grid { position:fixed; inset:0; z-index:0; background-image:linear-gradient(var(--border) 1px,transparent 1px),linear-gradient(90deg,var(--border) 1px,transparent 1px); background-size:40px 40px; opacity:0.3; }
+  .bg-glow { position:fixed; top:-200px; left:50%; transform:translateX(-50%); width:600px; height:400px; background:radial-gradient(ellipse,#e8ff0015 0%,transparent 70%); z-index:0; }
+  .container { position:relative; z-index:1; width:100%; max-width:420px; padding:20px; }
+  .logo { text-align:center; margin-bottom:32px; }
+  .logo-text { font-size:32px; font-weight:900; letter-spacing:3px; color:var(--accent); text-transform:uppercase; }
+  .logo-sub { font-size:11px; color:var(--text3); letter-spacing:4px; margin-top:4px; }
+  .card { background:var(--bg2); border:1px solid var(--border); border-radius:16px; padding:32px; box-shadow:0 0 40px #e8ff0008; }
+  .tabs { display:flex; background:var(--bg3); border-radius:8px; padding:4px; margin-bottom:24px; }
+  .tab { flex:1; padding:8px; border-radius:6px; border:none; background:transparent; color:var(--text3); font-size:13px; font-weight:600; cursor:pointer; transition:all .15s; }
+  .tab.active { background:var(--bg); color:var(--text); }
+  .form-group { margin-bottom:16px; }
+  label { display:block; font-size:12px; font-weight:600; color:var(--text2); margin-bottom:6px; text-transform:uppercase; letter-spacing:1px; }
+  input { width:100%; padding:11px 14px; background:var(--bg3); border:1px solid var(--border); border-radius:8px; color:var(--text); font-size:14px; outline:none; transition:border-color .15s; }
+  input:focus { border-color:var(--accent); }
+  input::placeholder { color:var(--text3); }
+  .btn { width:100%; padding:13px; border-radius:8px; border:none; font-size:14px; font-weight:800; cursor:pointer; transition:all .15s; }
+  .btn-primary { background:var(--accent); color:#000; }
+  .btn-primary:hover { background:#d4e800; }
+  .btn-primary:disabled { opacity:0.5; cursor:not-allowed; }
+  .divider { display:flex; align-items:center; gap:12px; margin:20px 0; }
+  .divider-line { flex:1; height:1px; background:var(--border); }
+  .divider-text { font-size:12px; color:var(--text3); }
+  .btn-google { width:100%; padding:11px; border-radius:8px; border:1px solid var(--border); background:var(--bg3); color:var(--text); font-size:13px; font-weight:600; cursor:pointer; transition:all .15s; display:flex; align-items:center; justify-content:center; gap:8px; }
+  .btn-google:hover { border-color:var(--text2); }
+  .error-msg { background:#ff3b3b18; border:1px solid #ff3b3b44; border-radius:8px; padding:10px 14px; font-size:13px; color:var(--red); margin-bottom:16px; display:none; }
+  .success-msg { background:#00e67618; border:1px solid #00e67644; border-radius:8px; padding:10px 14px; font-size:13px; color:var(--green); margin-bottom:16px; display:none; }
+  .footer-text { text-align:center; font-size:12px; color:var(--text3); margin-top:20px; line-height:1.6; }
+  .footer-text a { color:var(--accent2); text-decoration:none; }
+  .spinner { display:inline-block; width:16px; height:16px; border:2px solid #00000044; border-top-color:#000; border-radius:50%; animation:spin .6s linear infinite; margin-right:8px; vertical-align:middle; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="bg-grid"></div>
+<div class="bg-glow"></div>
+<div class="container">
+  <div class="logo">
+    <div class="logo-text">APEX AI</div>
+    <div class="logo-sub">Sim Racing Coach</div>
+  </div>
+  <div class="card">
+    <div class="tabs">
+      <button class="tab active" id="tabSignin" onclick="switchTab('signin')">Sign In</button>
+      <button class="tab" id="tabSignup" onclick="switchTab('signup')">Create Account</button>
+    </div>
+    <div id="errorMsg" class="error-msg"></div>
+    <div id="successMsg" class="success-msg"></div>
+
+    <div id="formSignin">
+      <div class="form-group"><label>Email</label><input type="email" id="signinEmail" placeholder="you@example.com" autocomplete="email"></div>
+      <div class="form-group"><label>Password</label><input type="password" id="signinPassword" placeholder="••••••••" autocomplete="current-password"></div>
+      <button class="btn btn-primary" id="signinBtn" onclick="signIn()">Sign In</button>
+      <div style="text-align:right;margin-top:10px;"><a href="#" onclick="showReset()" style="font-size:12px;color:var(--text3);">Forgot password?</a></div>
+    </div>
+
+    <div id="formSignup" style="display:none;">
+      <div class="form-group"><label>Full Name</label><input type="text" id="signupName" placeholder="Your name" autocomplete="name"></div>
+      <div class="form-group"><label>Email</label><input type="email" id="signupEmail" placeholder="you@example.com" autocomplete="email"></div>
+      <div class="form-group"><label>Password</label><input type="password" id="signupPassword" placeholder="At least 8 characters" autocomplete="new-password"></div>
+      <button class="btn btn-primary" id="signupBtn" onclick="signUp()">Create Account</button>
+    </div>
+
+    <div id="formReset" style="display:none;">
+      <div style="font-size:13px;color:var(--text2);margin-bottom:16px;">Enter your email and we'll send you a reset link.</div>
+      <div class="form-group"><label>Email</label><input type="email" id="resetEmail" placeholder="you@example.com"></div>
+      <button class="btn btn-primary" onclick="sendReset()">Send Reset Link</button>
+      <div style="text-align:center;margin-top:12px;"><a href="#" onclick="switchTab('signin')" style="font-size:12px;color:var(--text3);">Back to sign in</a></div>
+    </div>
+
+    <div class="divider"><div class="divider-line"></div><div class="divider-text">or</div><div class="divider-line"></div></div>
+    <button class="btn-google" onclick="signInGoogle()">
+      <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.31-8.16 2.31-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+      Continue with Google
+    </button>
+  </div>
+  <div class="footer-text">By signing in you agree to our <a href="#">Terms of Service</a> and <a href="#">Privacy Policy</a>.<br>Free plan includes 5 laps per session.</div>
+</div>
+<script>
+const SUPABASE_URL = 'https://aidagxmynqzrbkyagvcz.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFpZGFneG15bnF6cmJreWFndmN6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODExMjk2MjgsImV4cCI6MjA5NjcwNTYyOH0.og_8Lztn5GhonZwwMM5ZK0oCbdgW5hRw9cNqfDuiVYE';
+let supabase = null;
+
+function initSupabase() {
+  if (window.supabase) {
+    supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) window.location.href = 'apex-ai.html';
+    });
+  } else {
+    setTimeout(initSupabase, 100);
+  }
+}
+document.addEventListener('DOMContentLoaded', initSupabase);
+
+function switchTab(tab) {
+  const s = tab === 'signin';
+  document.getElementById('tabSignin').classList.toggle('active', s);
+  document.getElementById('tabSignup').classList.toggle('active', !s);
+  document.getElementById('formSignin').style.display = s ? 'block' : 'none';
+  document.getElementById('formSignup').style.display = !s ? 'block' : 'none';
+  document.getElementById('formReset').style.display = 'none';
+  hideMessages();
+}
+function showReset() {
+  document.getElementById('formSignin').style.display = 'none';
+  document.getElementById('formReset').style.display = 'block';
+  hideMessages();
+}
+function showError(msg) { const e=document.getElementById('errorMsg'); e.textContent=msg; e.style.display='block'; document.getElementById('successMsg').style.display='none'; }
+function showSuccess(msg) { const e=document.getElementById('successMsg'); e.textContent=msg; e.style.display='block'; document.getElementById('errorMsg').style.display='none'; }
+function hideMessages() { document.getElementById('errorMsg').style.display='none'; document.getElementById('successMsg').style.display='none'; }
+function setLoading(id, on, label) { const b=document.getElementById(id); b.disabled=on; b.innerHTML=on?'<span class="spinner"></span>Please wait...':label; }
+
+async function signIn() {
+  const email=document.getElementById('signinEmail').value.trim();
+  const password=document.getElementById('signinPassword').value;
+  if (!email||!password) return showError('Please fill in all fields.');
+  setLoading('signinBtn',true,'Sign In'); hideMessages();
+  const {error}=await supabase.auth.signInWithPassword({email,password});
+  setLoading('signinBtn',false,'Sign In');
+  if (error) return showError(error.message);
+  window.location.href='apex-ai.html';
+}
+async function signUp() {
+  const name=document.getElementById('signupName').value.trim();
+  const email=document.getElementById('signupEmail').value.trim();
+  const password=document.getElementById('signupPassword').value;
+  if (!name||!email||!password) return showError('Please fill in all fields.');
+  if (password.length<8) return showError('Password must be at least 8 characters.');
+  setLoading('signupBtn',true,'Create Account'); hideMessages();
+  const {error}=await supabase.auth.signUp({email,password,options:{data:{full_name:name},emailRedirectTo:window.location.origin+'/apex-ai.html'}});
+  setLoading('signupBtn',false,'Create Account');
+  if (error) return showError(error.message);
+  showSuccess('Check your email to confirm your account, then sign in.');
+}
+async function sendReset() {
+  const email=document.getElementById('resetEmail').value.trim();
+  if (!email) return showError('Please enter your email.');
+  hideMessages();
+  const {error}=await supabase.auth.resetPasswordForEmail(email,{redirectTo:window.location.origin+'/apex-ai.html'});
+  if (error) return showError(error.message);
+  showSuccess('Reset link sent — check your email.');
+}
+async function signInGoogle() {
+  const {error}=await supabase.auth.signInWithOAuth({provider:'google',options:{redirectTo:window.location.origin+'/apex-ai.html'}});
+  if (error) showError(error.message);
+}
+document.addEventListener('keydown', e => {
+  if (e.key!=='Enter') return;
+  if (document.getElementById('formSignin').style.display!=='none') signIn();
+  else if (document.getElementById('formSignup').style.display!=='none') signUp();
+});
+</script>
+</body>
+</html>
