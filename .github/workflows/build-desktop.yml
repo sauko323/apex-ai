@@ -32,7 +32,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: APEX-AI-Windows
-          path: apex-desktop/dist/**/*.exe
+          path: apex-desktop/dist/
+          if-no-files-found: warn
 
   build-mac:
     runs-on: macos-latest
@@ -59,7 +60,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: APEX-AI-Mac
-          path: apex-desktop/dist/**/*.dmg
+          path: apex-desktop/dist/
+          if-no-files-found: warn
 
   release:
     needs: [build-windows, build-mac]
