@@ -936,6 +936,39 @@
           </div>
         </div>
 
+        <div class="card" style="margin-bottom:16px;">
+          <div class="card-title">Live Telemetry Feed</div>
+          <div style="display:flex;gap:16px;margin-bottom:10px;">
+            <div style="text-align:center;min-width:60px;">
+              <div style="font-size:28px;font-weight:900;font-family:monospace;color:var(--accent);" id="rollSpeed">0</div>
+              <div style="font-size:10px;color:var(--text3);">KM/H</div>
+            </div>
+            <div style="text-align:center;min-width:50px;">
+              <div style="font-size:28px;font-weight:900;color:var(--accent2);" id="rollGear">N</div>
+              <div style="font-size:10px;color:var(--text3);">GEAR</div>
+            </div>
+            <div style="flex:1;">
+              <div style="margin-bottom:6px;">
+                <div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span style="font-size:11px;color:#00e676;">THROTTLE</span><span style="font-size:11px;font-weight:700;color:#00e676;" id="rollTVal">0%</span></div>
+                <div style="height:8px;background:var(--bg4);border-radius:4px;overflow:hidden;"><div id="rollTBar" style="height:100%;width:0%;background:linear-gradient(90deg,#00c853,#69f0ae);border-radius:4px;transition:width .08s;"></div></div>
+              </div>
+              <div>
+                <div style="display:flex;justify-content:space-between;margin-bottom:3px;"><span style="font-size:11px;color:#ff3b3b;">BRAKE</span><span style="font-size:11px;font-weight:700;color:#ff3b3b;" id="rollBVal">0%</span></div>
+                <div style="height:8px;background:var(--bg4);border-radius:4px;overflow:hidden;"><div id="rollBBar" style="height:100%;width:0%;background:linear-gradient(90deg,#d50000,#ff6e6e);border-radius:4px;transition:width .08s;"></div></div>
+              </div>
+            </div>
+          </div>
+          <div style="position:relative;height:180px;">
+            <canvas id="liveRollChart"></canvas>
+          </div>
+          <div style="display:flex;gap:16px;margin-top:8px;">
+            <span style="font-size:11px;color:var(--accent);">— Speed</span>
+            <span style="font-size:11px;color:#00e676;">— Throttle</span>
+            <span style="font-size:11px;color:#ff3b3b;">— Brake</span>
+            <span style="font-size:11px;color:var(--text3);margin-left:auto;" id="rollStatus">Waiting for game...</span>
+          </div>
+        </div>
+
         <div class="card">
           <div class="card-title">Live AI Coaching Alerts (Mid-Session)</div>
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
@@ -2053,15 +2086,22 @@ function simStep() {
   const speed = Math.round(120 + 130*Math.abs(Math.sin(phase*0.7)));
   const gear = Math.max(2, Math.min(7, Math.round(2 + speed/50)));
   const delta = ((Math.sin(phase*0.5)*0.8)).toFixed(3);
-  document.getElementById('liveThrottle').style.width = throttle+'%';
-  document.getElementById('liveTVal').textContent = throttle+'%';
-  document.getElementById('liveBrake').style.width = brake+'%';
-  document.getElementById('liveBVal').textContent = brake+'%';
-  document.getElementById('liveSpeed').innerHTML = speed+'<span style="font-size:14px;color:var(--text3);"> km/h</span>';
-  document.getElementById('liveGear').textContent = gear;
+  // Route through updateDashboard so rolling chart and all elements update
+  if (window.APEX_LIVE) {
+    window.APEX_LIVE.speed = speed; window.APEX_LIVE.throttle = throttle;
+    window.APEX_LIVE.brake = brake; window.APEX_LIVE.gear = gear;
+    window.APEX_LIVE.game = window.APEX_LIVE.game || 'sim';
+  }
+  // Update delta separately (sim-only field)
   const dEl = document.getElementById('liveDelta');
-  dEl.textContent = (parseFloat(delta) >= 0 ? '+' : '') + delta;
-  dEl.className = parseFloat(delta) >= 0 ? 'delta-positive' : 'delta-negative';
+  if (dEl) {
+    dEl.textContent = (parseFloat(delta) >= 0 ? '+' : '') + delta;
+    dEl.className = parseFloat(delta) >= 0 ? 'delta-positive' : 'delta-negative';
+  }
+  // Use the live update path
+  if (typeof window._apexUpdateDashboard === 'function') {
+    window._apexUpdateDashboard({ speed, throttle, brake, gear });
+  }
 }
 
 function switchTelTab(el, name) {
@@ -3506,6 +3546,282 @@ window.showPage = function(name) {
 
 // Load plan on start
 setTimeout(loadUserPlan, 2000);
+</script>
+
+<script>
+// ─── APEX AI Live Bridge Connection ─────────────────────────────────────────
+// Connects to the desktop bridge via WebSocket (ws://localhost:8765)
+// or listens for data from the Electron preload (window.APEX_DESKTOP)
+(function() {
+
+  // Live data state
+  const live = {
+    connected: false,
+    game: null,
+    speed: 0,
+    rpm: 0,
+    gear: 0,
+    throttle: 0,
+    brake: 0,
+    lapTime: null,
+    bestLap: null,
+    sector1: null,
+    sector2: null,
+    sector3: null,
+    localIP: null,
+  };
+
+  // ── Status bar in topbar ──────────────────────────────────────────────────
+  function createStatusBar() {
+    const topbar = document.querySelector('.topbar');
+    if (!topbar || document.getElementById('live-status-bar')) return;
+    const bar = document.createElement('div');
+    bar.id = 'live-status-bar';
+    bar.style.cssText = 'margin-left:auto;display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;letter-spacing:1px;';
+    bar.innerHTML = `
+      <div id="live-dot" style="width:8px;height:8px;border-radius:50%;background:#555;"></div>
+      <span id="live-label" style="color:var(--text3);">NO GAME</span>
+      <span id="live-game" style="color:var(--accent);display:none;"></span>
+    `;
+    topbar.appendChild(bar);
+  }
+
+  function setStatus(connected, game) {
+    live.connected = connected;
+    live.game = game;
+    const dot = document.getElementById('live-dot');
+    const label = document.getElementById('live-label');
+    const gameEl = document.getElementById('live-game');
+    if (!dot) return;
+    if (connected) {
+      dot.style.background = '#22c55e';
+      label.style.color = '#22c55e';
+      label.textContent = 'LIVE';
+      if (gameEl) { gameEl.textContent = game || ''; gameEl.style.display = 'inline'; }
+    } else {
+      dot.style.background = '#555';
+      label.style.color = 'var(--text3)';
+      label.textContent = game === 'starting' ? 'CONNECTING...' : 'NO GAME';
+      if (gameEl) gameEl.style.display = 'none';
+    }
+  }
+
+  // ── Rolling chart (live telemetry feed) ──────────────────────────────────
+  const ROLL_MAX = 200;
+  const rollData = { speed: [], throttle: [], brake: [], labels: [] };
+  let rollChart = null;
+  let rollTick = 0;
+
+  function getRollChart() {
+    if (rollChart) return rollChart;
+    const canvas = document.getElementById('liveRollChart');
+    if (!canvas) return null;
+    rollChart = new Chart(canvas, {
+      type: 'line',
+      data: {
+        labels: rollData.labels,
+        datasets: [
+          { label: 'Speed', data: rollData.speed, borderColor: '#e8ff00', borderWidth: 1.5, pointRadius: 0, tension: 0.2, fill: false, yAxisID: 'ySpeed' },
+          { label: 'Throttle', data: rollData.throttle, borderColor: '#00e676', borderWidth: 1.5, pointRadius: 0, tension: 0.2, fill: true, backgroundColor: '#00e67615', yAxisID: 'yPct' },
+          { label: 'Brake', data: rollData.brake, borderColor: '#ff3b3b', borderWidth: 1.5, pointRadius: 0, tension: 0.2, fill: true, backgroundColor: '#ff3b3b15', yAxisID: 'yPct' },
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { display: false },
+          ySpeed: { position: 'left', min: 0, max: 350, grid: { color: '#2a2a3844' }, ticks: { color: '#e8ff00aa', font: { size: 10 }, callback: v => v + '' } },
+          yPct:   { position: 'right', min: 0, max: 100, grid: { display: false }, ticks: { color: '#a0a0b8aa', font: { size: 10 }, callback: v => v + '%' } },
+        }
+      }
+    });
+    return rollChart;
+  }
+
+  function pushRoll(speed, throttle, brake) {
+    rollTick++;
+    rollData.labels.push(rollTick);
+    rollData.speed.push(speed);
+    rollData.throttle.push(throttle);
+    rollData.brake.push(brake);
+    if (rollData.labels.length > ROLL_MAX) {
+      rollData.labels.shift(); rollData.speed.shift(); rollData.throttle.shift(); rollData.brake.shift();
+    }
+    const c = getRollChart();
+    if (c) c.update('none');
+  }
+
+  // ── Update dashboard with live data ──────────────────────────────────────
+  function updateDashboard(data) {
+    const spd   = Math.round(data.speed    || 0);
+    const rpm   = Math.round(data.rpm      || 0);
+    const gear  = data.gear  != null ? data.gear  : 0;
+    const thr   = Math.round(data.throttle || 0);
+    const brk   = Math.round(data.brake    || 0);
+
+    // data-live attribute bindings
+    document.querySelectorAll('[data-live="speed"]').forEach(el => el.textContent = spd);
+    document.querySelectorAll('[data-live="rpm"]').forEach(el => el.textContent = rpm.toLocaleString());
+    document.querySelectorAll('[data-live="gear"]').forEach(el => el.textContent = gear);
+    document.querySelectorAll('[data-live="throttle"]').forEach(el => {
+      el.textContent = thr + '%';
+      if (el.classList.contains('progress-bar')) el.style.width = thr + '%';
+    });
+    document.querySelectorAll('[data-live="brake"]').forEach(el => {
+      el.textContent = brk + '%';
+      if (el.classList.contains('progress-bar')) el.style.width = brk + '%';
+    });
+
+    // Live overlay elements (Live Overlay page)
+    const lsEl = document.getElementById('liveSpeed');
+    if (lsEl) lsEl.innerHTML = spd + '<span style="font-size:14px;color:var(--text3);"> km/h</span>';
+    const lgEl = document.getElementById('liveGear');
+    if (lgEl) lgEl.textContent = gear;
+    const ltEl = document.getElementById('liveThrottle');
+    if (ltEl) ltEl.style.width = thr + '%';
+    const ltvEl = document.getElementById('liveTVal');
+    if (ltvEl) ltvEl.textContent = thr + '%';
+    const lbEl = document.getElementById('liveBrake');
+    if (lbEl) lbEl.style.width = brk + '%';
+    const lbvEl = document.getElementById('liveBVal');
+    if (lbvEl) lbvEl.textContent = brk + '%';
+
+    // Live feed card (rollSpeed, rollGear, rollTVal, rollBVal, rollTBar, rollBBar)
+    const rsEl = document.getElementById('rollSpeed'); if (rsEl) rsEl.textContent = spd;
+    const rgEl = document.getElementById('rollGear');  if (rgEl) rgEl.textContent = gear || 'N';
+    const rtEl = document.getElementById('rollTVal');  if (rtEl) rtEl.textContent = thr + '%';
+    const rbEl = document.getElementById('rollBVal');  if (rbEl) rbEl.textContent = brk + '%';
+    const rtbEl = document.getElementById('rollTBar'); if (rtbEl) rtbEl.style.width = thr + '%';
+    const rbbEl = document.getElementById('rollBBar'); if (rbbEl) rbbEl.style.width = brk + '%';
+    const rsEl2 = document.getElementById('rollStatus'); if (rsEl2) rsEl2.textContent = live.game ? live.game.toUpperCase() + ' — LIVE' : 'Connected';
+
+    // Push to rolling chart
+    pushRoll(spd, thr, brk);
+
+    // Stat cards (dashboard page)
+    updateStatCard('speed', spd + ' km/h');
+    updateStatCard('rpm', rpm.toLocaleString());
+    updateStatCard('throttle', thr + '%');
+    updateStatCard('brake', brk + '%');
+  }
+
+  function updateStatCard(type, value) {
+    const cards = document.querySelectorAll('.stat-card, .stat-value');
+    cards.forEach(card => {
+      const label = card.querySelector?.('.stat-label') || card.previousElementSibling;
+      if (label && label.textContent?.toLowerCase().includes(type)) {
+        const val = card.querySelector('.stat-value') || card;
+        if (val) val.textContent = value;
+      }
+    });
+  }
+
+  // ── Process incoming message from bridge ──────────────────────────────────
+  function handleMessage(msg) {
+    if (typeof msg === 'string') {
+      try { msg = JSON.parse(msg); } catch { return; }
+    }
+
+    if (msg.type === 'status') {
+      const connected = !['disconnected','starting'].includes(msg.status);
+      setStatus(connected, connected ? msg.status : null);
+      if (msg.status === 'starting') setStatus(false, 'starting');
+    }
+
+    if (msg.type === 'telemetry') {
+      Object.assign(live, msg);
+      updateDashboard(live);
+    }
+
+    if (msg.type === 'local-ip') {
+      live.localIP = msg.ip;
+      // Update any IP display elements
+      document.querySelectorAll('[data-live="local-ip"]').forEach(el => el.textContent = msg.ip);
+    }
+  }
+
+  // ── WebSocket connection (browser / web app) ──────────────────────────────
+  let ws = null;
+  let wsRetries = 0;
+
+  function connectWS() {
+    if (ws && ws.readyState === WebSocket.OPEN) return;
+    try {
+      ws = new WebSocket('ws://localhost:8765');
+
+      ws.onopen = () => {
+        wsRetries = 0;
+        console.log('[APEX] Bridge connected');
+      };
+
+      ws.onmessage = (e) => handleMessage(e.data);
+
+      ws.onclose = () => {
+        setStatus(false, null);
+        // Retry with backoff, max every 10s
+        const delay = Math.min(1000 * Math.pow(1.5, wsRetries++), 10000);
+        setTimeout(connectWS, delay);
+      };
+
+      ws.onerror = () => { ws.close(); };
+    } catch(e) {
+      setTimeout(connectWS, 5000);
+    }
+  }
+
+  // ── Electron IPC (desktop app) ────────────────────────────────────────────
+  function connectElectron() {
+    if (!window.APEX_DESKTOP) return false;
+
+    window.APEX_DESKTOP.onTelemetry(data => {
+      Object.assign(live, data);
+      updateDashboard(live);
+    });
+
+    window.APEX_DESKTOP.onBridgeStatus(msg => handleMessage(msg));
+
+    window.APEX_DESKTOP.onLocalIP(ip => {
+      live.localIP = ip;
+      document.querySelectorAll('[data-live="local-ip"]').forEach(el => el.textContent = ip);
+    });
+
+    // Get initial state
+    window.APEX_DESKTOP.getBridgeStatus().then(status => {
+      setStatus(!['disconnected','starting'].includes(status), status);
+    });
+
+    window.APEX_DESKTOP.getLocalIP().then(ip => {
+      live.localIP = ip;
+      document.querySelectorAll('[data-live="local-ip"]').forEach(el => el.textContent = ip);
+    });
+
+    return true;
+  }
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+  function init() {
+    createStatusBar();
+
+    if (connectElectron()) {
+      console.log('[APEX] Using Electron bridge');
+    } else {
+      console.log('[APEX] Trying WebSocket bridge on ws://localhost:8765');
+      connectWS();
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+
+  // Expose live data + update fn globally for other scripts
+  window.APEX_LIVE = live;
+  window._apexUpdateDashboard = updateDashboard;
+
+})();
 </script>
 </body>
 </html>
