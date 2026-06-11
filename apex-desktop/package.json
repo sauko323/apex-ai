@@ -23,7 +23,7 @@
   },
   "build": {
     "appId": "com.apexai.simracing",
-    "productName": "APEX AI",
+    "productName": "APEX-AI",
     "copyright": "Copyright © 2025 APEX AI",
     "directories": {
       "output": "dist"
