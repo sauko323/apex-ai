@@ -3,8 +3,8 @@ name: Build APEX AI Desktop App
 on:
   push:
     tags:
-      - 'v*'          # Triggers on version tags like v1.0.0
-  workflow_dispatch:  # Also allows manual trigger from GitHub Actions tab
+      - 'v*'
+  workflow_dispatch:
 
 jobs:
   build-windows:
@@ -26,15 +26,13 @@ jobs:
 
       - name: Build Windows installer
         working-directory: apex-desktop
-        run: npm run build:win
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --win --publish never
 
       - name: Upload Windows installer
         uses: actions/upload-artifact@v4
         with:
           name: APEX-AI-Windows
-          path: apex-desktop/dist/*.exe
+          path: apex-desktop/dist/**/*.exe
 
   build-mac:
     runs-on: macos-latest
@@ -55,20 +53,20 @@ jobs:
 
       - name: Build Mac DMG
         working-directory: apex-desktop
-        run: npm run build:mac
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npx electron-builder --mac --publish never
 
       - name: Upload Mac DMG
         uses: actions/upload-artifact@v4
         with:
           name: APEX-AI-Mac
-          path: apex-desktop/dist/*.dmg
+          path: apex-desktop/dist/**/*.dmg
 
   release:
     needs: [build-windows, build-mac]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -77,27 +75,25 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            APEX-AI-Windows/*.exe
-            APEX-AI-Mac/*.dmg
+            APEX-AI-Windows/**/*.exe
+            APEX-AI-Mac/**/*.dmg
           body: |
             ## APEX AI Desktop App
 
             ### Download
-            - **Windows**: Download the `.exe` installer
-            - **Mac**: Download the `.dmg` and drag APEX AI to Applications
+            - **Windows**: Download the `.exe` installer — run it and follow the setup wizard
+            - **Mac**: Download the `.dmg` — open it and drag APEX AI to Applications
 
             ### Console Setup (PS5/Xbox)
-            After installing, open APEX AI and go to **Settings → Console Setup** to see your IP address.
-            Enter this IP in your game's telemetry settings.
+            Open APEX AI after installing. The tray icon shows your PC's IP address.
+            Enter this IP once in your game's telemetry settings:
 
-            **Supported games:**
-            | Game | Platform | Setting |
-            |------|----------|---------|
-            | F1 24 / F1 25 | PS5, Xbox, PC | Settings → Telemetry → UDP Output On, IP = your PC IP |
-            | Gran Turismo 7 | PS5 | Options → Others → Send Data = On, IP = your PC IP |
-            | Forza Motorsport | Xbox, PC | Settings → HUD → Data Out = On, IP = your PC IP |
-            | WRC | PS5, Xbox, PC | Settings → Advanced → Telemetry, IP = your PC IP |
-            | iRacing | PC only | Auto-detected |
-            | ACC, AC, rFactor 2, LMU | PC only | Auto-detected |
+            | Game | Platform | Where to set it |
+            |------|----------|-----------------|
+            | F1 24 / F1 25 | PS5, Xbox, PC | Settings → Telemetry → UDP Output On |
+            | Gran Turismo 7 | PS5 | Options → Others → Send Data = On |
+            | Forza Motorsport | Xbox, PC | Settings → HUD → Data Out = On |
+            | WRC | PS5, Xbox, PC | Settings → Advanced → Telemetry |
+            | iRacing, ACC, AC, rFactor 2, LMU | PC only | Auto-detected, no setup needed |
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
